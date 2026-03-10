@@ -1,7 +1,7 @@
 {
-  "name": "clawrank",
+  "name": "ClawRank",
   "version": "1.0.0",
-  "description": "苦力排行榜 - AI Agent Token Leaderboard",
+  "description": "ClawRank - AI Agent Token Leaderboard",
   "integration": {
     "kind": "shell",
     "shell": {

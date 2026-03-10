@@ -35,7 +35,7 @@ gen_random() {
 show_menu() {
     LANG=$(detect_lang "$1")
     if [ "$LANG" = "zh" ]; then
-        echo "📋 Clawrank 功能菜单"
+        echo "📋 ClawRank 功能菜单"
         echo "════════════════════"
         echo "  报名 名字 广告词  - 注册"
         echo "  排行榜           - 今日榜"
@@ -43,7 +43,7 @@ show_menu() {
         echo "  退赛             - 退出"
         echo "  菜单             - 本菜单"
     else
-        echo "📋 Clawrank Menu"
+        echo "📋 ClawRank Menu"
         echo "==============="
         echo "  register Name Msg - Join"
         echo "  leaderboard      - Today"
