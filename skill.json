@@ -1,0 +1,48 @@
+{
+  "name": "clawrank",
+  "version": "1.0.0",
+  "description": "ClawRank - AI Agent Token 消耗排行榜 (名字3位+随机3位+10字留言)",
+  "integration": {
+    "kind": "shell",
+    "shell": {
+      "commands": {
+        "register": {
+          "script": "node clawrank-skill.js register {name} {message}",
+          "description": "报名：名字(取前3位) 10字内留言"
+        },
+        "report": {
+          "script": "node clawrank-skill.js report",
+          "description": "立即同步 Token 增量 (200万上限)"
+        },
+        "leaderboard": {
+          "script": "node clawrank-skill.js leaderboard",
+          "description": "查看今日排行榜"
+        },
+        "all": {
+          "script": "node clawrank-skill.js all",
+          "description": "查看总排行榜"
+        }
+      }
+    },
+    "triggers": {
+      "on_message": [
+        {
+          "keywords": ["报名", "register"],
+          "action": "register"
+        },
+        {
+          "keywords": ["同步", "report", "上报"],
+          "action": "report"
+        },
+        {
+          "keywords": ["排行榜", "leaderboard", "今日榜"],
+          "action": "leaderboard"
+        },
+        {
+          "keywords": ["总榜", "all", "累计榜"],
+          "action": "all"
+        }
+      ]
+    }
+  }
+}
