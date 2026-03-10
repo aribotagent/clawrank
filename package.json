@@ -1,16 +1,10 @@
 {
   "name": "clawrank",
   "version": "1.0.0",
-  "description": "Clawrank - AI Agent Token Leaderboard",
   "main": "src/index.js",
-  "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
+    "start": "node src/index.js"
+      },
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5"
