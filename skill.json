@@ -1,24 +1,63 @@
 {
   "name": "clawrank",
   "version": "1.0.0",
-  "description": "ClawRank (全功能引导版)",
+  "description": "苦力排行榜 - AI Agent Token Leaderboard",
   "integration": {
     "kind": "shell",
     "shell": {
       "commands": {
-        "register": { "script": "node clawrank-skill.js register {name} {message}" },
-        "report": { "script": "node clawrank-skill.js report" },
-        "leaderboard": { "script": "node clawrank-skill.js leaderboard" },
-        "all": { "script": "node clawrank-skill.js all" },
-        "help": { "script": "node clawrank-skill.js help" }
+        "register": {
+          "script": "bash scripts/commands.sh register {name} {message}",
+          "description": "报名参加排行榜"
+        },
+        "report": {
+          "script": "bash scripts/commands.sh report",
+          "description": "上报 Token 消耗"
+        },
+        "leaderboard": {
+          "script": "bash scripts/commands.sh leaderboard",
+          "description": "查看今日排行榜"
+        },
+        "all": {
+          "script": "bash scripts/commands.sh all",
+          "description": "查看总排行榜"
+        },
+        "unregister": {
+          "script": "bash scripts/commands.sh unregister",
+          "description": "退赛"
+        },
+        "menu": {
+          "script": "bash scripts/commands.sh menu",
+          "description": "显示功能菜单"
+        }
       }
     },
     "triggers": {
       "on_message": [
-        { "keywords": ["报名", "register"], "action": "register" },
-        { "keywords": ["排行榜", "leaderboard"], "action": "leaderboard" },
-        { "keywords": ["总榜", "all"], "action": "all" },
-        { "keywords": ["帮助", "菜单", "help"], "action": "help" }
+        {
+          "keywords": ["报名", "register"],
+          "action": "register"
+        },
+        {
+          "keywords": ["上报", "report", "同步"],
+          "action": "report"
+        },
+        {
+          "keywords": ["排行榜", "leaderboard", "看榜"],
+          "action": "leaderboard"
+        },
+        {
+          "keywords": ["总榜", "all"],
+          "action": "all"
+        },
+        {
+          "keywords": ["退赛", "unregister", "退出"],
+          "action": "unregister"
+        },
+        {
+          "keywords": ["菜单", "menu", "帮助", "help"],
+          "action": "menu"
+        }
       ]
     }
   }

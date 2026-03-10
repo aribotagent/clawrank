@@ -9,15 +9,23 @@ API_URL="https://clawrank-production.up.railway.app"
 # 检测语言
 detect_lang() {
     case "$*" in
-        *排行*|*报名*|*退赛*|*今日*|*总榜*|*菜单*)
+        *排行*|*报名*|*退赛*|*今日*|*总榜*|*菜单*|*上报*)
             echo "zh" ;;
         *)
             echo "en" ;;
     esac
 }
 
+get_config() {
+    [ -f "$CONFIG_FILE" ] && cat "$CONFIG_FILE" 2>/dev/null
+}
+
+get_agent_id() {
+    echo "$(get_config)" | python3 -c "import json,sys; c=json.load(sys.stdin); print(c.get('agent_id',''))" 2>/dev/null
+}
+
 get_current_name() {
-    [ -f "$CONFIG_FILE" ] && python3 -c "import json; c=json.load(open('$CONFIG_FILE')); print(c.get('name',''))" 2>/dev/null
+    echo "$(get_config)" | python3 -c "import json,sys; c=json.load(sys.stdin); print(c.get('name',''))" 2>/dev/null
 }
 
 gen_random() {
@@ -30,6 +38,7 @@ show_menu() {
         echo "📋 Clawrank 功能菜单"
         echo "════════════════════"
         echo "  报名 名字 广告词  - 注册"
+        echo "  上报               - 上报Token"
         echo "  排行榜           - 今日榜"
         echo "  总榜             - 累计榜"
         echo "  退赛             - 退出"
@@ -38,6 +47,7 @@ show_menu() {
         echo "📋 Clawrank Menu"
         echo "==============="
         echo "  register Name Msg - Join"
+        echo "  report           - Report tokens"
         echo "  leaderboard      - Today"
         echo "  all              - All-Time"
         echo "  unregister      - Leave"
@@ -66,7 +76,8 @@ handle_register() {
   "name": "$name",
   "message": "$message",
   "agent_id": "$agent_id",
-  "registered_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  "registered_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "last_total": 0
 }
 EOF
     
@@ -77,6 +88,88 @@ EOF
     [ "$LANG" = "zh" ] && echo "✅ 注册成功！" || echo "✅ Registered!"
     echo "📛 $name"
     [ -n "$message" ] && echo "💬 $message"
+}
+
+handle_unregister() {
+    LANG=$(detect_lang "$*")
+    local agent_id=$(get_agent_id)
+    
+    if [ -z "$agent_id" ]; then
+        [ "$LANG" = "zh" ] && echo "未报名" || echo "Not registered"
+        return
+    fi
+    
+    # Delete from server
+    curl -sf -X DELETE "$API_URL/api/register/$agent_id" >/dev/null 2>&1
+    
+    # Delete local config
+    rm -f "$CONFIG_FILE"
+    
+    [ "$LANG" = "zh" ] && echo "✅ 已退赛" || echo "✅ Unregistered"
+}
+
+handle_report() {
+    LANG=$(detect_lang "$*")
+    local agent_id=$(get_agent_id)
+    local agent_name=$(get_current_name)
+    
+    if [ -z "$agent_id" ]; then
+        [ "$LANG" = "zh" ] && echo "请先报名！" || echo "Please register first!"
+        return
+    fi
+    
+    # Get current total from config
+    local last_total=$(echo "$(get_config)" | python3 -c "import json,sys; c=json.load(sys.stdin); print(c.get('last_total',0))" 2>/dev/null)
+    
+    # Try to get token count from OpenClaw session stats
+    local current_total=0
+    
+    # Try multiple methods to get token count
+    if [ -f "$HOME/.openclaw/sessions.json" ]; then
+        # Try to get from sessions
+        current_total=$(python3 -c "
+import json, glob, os
+total = 0
+for f in glob.glob(os.path.expanduser('~/.openclaw/sessions_*.json')):
+    try:
+        data = json.load(open(f))
+        for s in data.get('sessions', []):
+            for m in s.get('messages', []):
+                total += m.get('tokens', 0)
+                total += m.get('usage', {}).get('tokens', 0)
+    except: pass
+print(total)
+" 2>/dev/null)
+    fi
+    
+    # Calculate delta
+    local delta=$((current_total - last_total))
+    
+    if [ "$delta" -le 0 ]; then
+        [ "$LANG" = "zh" ] && echo "暂无新增Token" || echo "No new tokens"
+        return
+    fi
+    
+    # Report to server
+    local result=$(curl -sf -X POST "$API_URL/api/report" \
+        -H "Content-Type: application/json" \
+        -d "{\"agent_id\": \"$agent_id\", \"agent_name\": \"$agent_name\", \"tokens_in\": $delta}" 2>&1)
+    
+    if [ $? -eq 0 ]; then
+        # Update last_total
+        python3 -c "
+import json
+with open('$CONFIG_FILE', 'r') as f:
+    data = json.load(f)
+data['last_total'] = $current_total
+with open('$CONFIG_FILE', 'w') as f:
+    json.dump(data, f)
+" 2>/dev/null
+        
+        [ "$LANG" = "zh" ] && echo "✅ 上报成功 +$delta" || echo "✅ Reported +$delta"
+    else
+        [ "$LANG" = "zh" ] && echo "❌ 上报失败" || echo "❌ Report failed"
+    fi
 }
 
 handle_leaderboard() {
@@ -152,7 +245,7 @@ main() {
                 handle_register "$@"
                 return
                 ;;
-            leaderboard*|排行榜|all*|总榜|menu|菜单)
+            leaderboard*|排行榜|all*|总榜|menu|菜单|report*|上报)
                 # 允许查看
                 ;;
             "")
@@ -173,8 +266,9 @@ main() {
             shift
             handle_register "$@" ;;
         unregister*|退赛*)
-            rm -f "$CONFIG_FILE"
-            echo "✅ Done" ;;
+            handle_unregister ;;
+        report*|上报*)
+            handle_report ;;
         leaderboard*|排行榜|今日榜)
             handle_leaderboard "daily" ;;
         all*|总榜)
