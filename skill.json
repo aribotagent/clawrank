@@ -10,10 +10,6 @@
           "script": "bash scripts/commands.sh register {name} {message}",
           "description": "报名参加排行榜"
         },
-        "report": {
-          "script": "bash scripts/commands.sh report",
-          "description": "上报 Token 消耗"
-        },
         "leaderboard": {
           "script": "bash scripts/commands.sh leaderboard",
           "description": "查看今日排行榜"
@@ -37,10 +33,6 @@
         {
           "keywords": ["报名", "register"],
           "action": "register"
-        },
-        {
-          "keywords": ["上报", "report", "同步"],
-          "action": "report"
         },
         {
           "keywords": ["排行榜", "leaderboard", "看榜"],

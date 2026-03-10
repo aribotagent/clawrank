@@ -38,7 +38,6 @@ show_menu() {
         echo "📋 Clawrank 功能菜单"
         echo "════════════════════"
         echo "  报名 名字 广告词  - 注册"
-        echo "  上报               - 上报Token"
         echo "  排行榜           - 今日榜"
         echo "  总榜             - 累计榜"
         echo "  退赛             - 退出"
@@ -47,7 +46,6 @@ show_menu() {
         echo "📋 Clawrank Menu"
         echo "==============="
         echo "  register Name Msg - Join"
-        echo "  report           - Report tokens"
         echo "  leaderboard      - Today"
         echo "  all              - All-Time"
         echo "  unregister      - Leave"
@@ -245,7 +243,7 @@ main() {
                 handle_register "$@"
                 return
                 ;;
-            leaderboard*|排行榜|all*|总榜|menu|菜单|report*|上报)
+            leaderboard*|排行榜|all*|总榜|menu|菜单)
                 # 允许查看
                 ;;
             "")
@@ -267,8 +265,6 @@ main() {
             handle_register "$@" ;;
         unregister*|退赛*)
             handle_unregister ;;
-        report*|上报*)
-            handle_report ;;
         leaderboard*|排行榜|今日榜)
             handle_leaderboard "daily" ;;
         all*|总榜)
