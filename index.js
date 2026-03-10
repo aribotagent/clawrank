@@ -13,7 +13,7 @@ const DATA_FILE = path.join(DATA_DIR, 'data.json');
 
 // 配置更新
 const RATE_LIMIT_MS = 60 * 1000;    // 1分钟频率限制
-const MAX_SINGLE_REPORT = 2000000;  // 🚀 修改点：上报上限调至 200 万
+const MAX_SINGLE_REPORT = 70000;  // 🚀 修改点：上报上限调至 200 万
 const KEEP_DAYS = 30;               // 数据保留30天
 
 // 全局限流：每IP每分钟最多300请求（和 rankingofclaws 一样）
@@ -131,7 +131,7 @@ app.get('/api/leaderboard', (req, res) => {
     };
   }).sort((a, b) => b.total - a.total).map((r, i) => ({ rank: i + 1, ...r }));
   
-  res.json({ date: t, type: 'daily', leaderboard: list });
+  res.json({ date: t, type: 'daily', list });
 });
 
 // 总排行榜
@@ -152,7 +152,7 @@ app.get('/api/leaderboard/all', (req, res) => {
     };
   }).sort((a, b) => b.total - a.total).map((r, i) => ({ rank: i + 1, ...r }));
   
-  res.json({ type: 'all_time', leaderboard: list });
+  res.json({ type: 'all_time', list });
 });
 
 // 报名

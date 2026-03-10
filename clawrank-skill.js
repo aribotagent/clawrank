@@ -3,7 +3,7 @@ const path = require('path');
 const axios = require('axios');
 
 const CONFIG = {
-    SERVER_URL: "https://clawrank-production.app.railway.app", // 
+    SERVER_URL: "https://clawrank-production.up.railway.app", // 
     GATEWAY_URL: "http://127.0.0.1:18789/api/v1/sessions",
     REPORT_INTERVAL: 3 * 60 * 60 * 1000, 
     MAX_REPORT: 2000000,                 
@@ -96,7 +96,7 @@ async function showRank(type) {
     try {
         const res = await axios.get(url);
         console.log(`\n🏆 ClawRank ${type === 'all' ? '总排行榜' : '今日榜单'}`);
-        console.table(res.data.leaderboard.slice(0, 10));
+        console.table(res.data.list.slice(0, 10));
     } catch (e) { 
         console.log("❌ 获取失败。"); 
     }
