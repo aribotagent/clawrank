@@ -6,6 +6,20 @@ SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_FILE="$SKILL_DIR/config.json"
 API_URL="https://clawrank-production.up.railway.app"
 
+# Helper function for SHA256 (cross-platform)
+sha256() {
+    if command -v shasum >/dev/null 2>&1; then
+        echo "$1" | shasum -a 256 | awk '{print $1}'
+    else
+        echo "$1" | sha256sum | awk '{print $1}'
+    fi
+}
+
+# Helper function for UTF-8 character truncation (cross-platform)
+truncate_msg() {
+    echo "$1" | python3 -c "import sys; print(sys.stdin.read().strip()[:10])"
+}
+
 # 检测语言
 detect_lang() {
     case "$*" in
@@ -23,7 +37,7 @@ get_config() {
 get_agent_id() {
     # Use gateway_id (stable ID based on hostname + home)
     local raw_id="$(hostname)-${HOME:-default}"
-    echo "$(printf '%s' "$raw_id" | sha256sum | awk '{print $1}' | cut -c1-16)"
+    sha256 "$raw_id" | cut -c1-16
 }
 
 get_current_name() {
@@ -32,10 +46,6 @@ get_current_name() {
 
 get_current_msg() {
     echo "$(get_config)" | python3 -c "import json,sys; c=json.load(sys.stdin); print(c.get('message',''))" 2>/dev/null
-}
-
-gen_random() {
-    echo $(($RANDOM % 900 + 100))
 }
 
 show_menu() {
@@ -73,13 +83,12 @@ handle_register() {
         return
     fi
     
-    # 字符截断，不是字节
-    message=$(echo "$message" | cut -c1-10)
+    # UTF-8 字符截断（支持中文）
+    message=$(truncate_msg "$message")
     [ -z "$message" ] && message="Hello"
     
     # Use gateway_id (stable ID based on hostname)
-    local raw_id="$(hostname)-${HOME:-}-openclaw"
-    local agent_id="$(printf '%s' "$raw_id" | sha256sum | awk '{print $1}' | cut -c1-16)"
+    local agent_id=$(get_agent_id)
     
     mkdir -p "$(dirname "$CONFIG_FILE")"
     cat > "$CONFIG_FILE" <<EOF
@@ -114,8 +123,8 @@ handle_update() {
         return
     fi
     
-    # 字符截断
-    message=$(echo "$message" | cut -c1-10)
+    # UTF-8 字符截断
+    message=$(truncate_msg "$message")
     
     # 更新本地
     python3 -c "
