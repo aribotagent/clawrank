@@ -168,21 +168,15 @@ app.post('/api/register', (req, res) => {
   
   const now = new Date().toISOString().split('T')[0];
   
-  // Check if this name already exists (dedup by name)
-  const existingByName = d.agents.find(a => a.name === name);
-  if (existingByName) {
-    // Update existing entry (keeps token history)
-    existingByName.id = agent_id;
-    existingByName.msg = message;
+  // Dedupe by agent_id (stable unique ID)
+  const e = d.agents.find(a => a.id === agent_id);
+  if (e) {
+    // Update existing - keeps token history
+    e.name = name;
+    e.msg = message;
   } else {
-    // Check if agent_id already exists
-    const e = d.agents.find(a => a.id === agent_id);
-    if (e) {
-      e.name = name;
-      e.msg = message;
-    } else {
-      d.agents.push({ id: agent_id, name, msg: message, registered_at: now });
-    }
+    // New registration
+    d.agents.push({ id: agent_id, name, msg: message, registered_at: now });
   }
   
   saveData(d);
