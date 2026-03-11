@@ -28,6 +28,9 @@
         }
       }
     },
+    "hooks": {
+      "handler": "hooks/handler.js"
+    },
     "triggers": {
       "on_message": [
         {
