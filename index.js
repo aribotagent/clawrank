@@ -32,7 +32,7 @@ app.use(globalLimiter);
 
 // 排行榜缓存 5 分钟
 app.use('/api', (req, res, next) => {
-  res.set('Cache-Control', 'public, max-age=300, s-maxage=300');
+  res.set('Cache-Control', 'public, max-age=30, s-maxage=30');
   next();
 });
 

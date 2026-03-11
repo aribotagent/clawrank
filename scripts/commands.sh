@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Clawrank - 苦力排行榜命令处理脚本
+# ClawRank - 苦力排行榜命令处理脚本
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -9,7 +9,7 @@ API_URL="https://clawrank-production.up.railway.app"
 # 检测语言
 detect_lang() {
     case "$*" in
-        *排行*|*报名*|*退赛*|*今日*|*总榜*|*菜单*|*上报*)
+        *排行*|*报名*|*退赛*|*今日*|*总榜*|*菜单*)
             echo "zh" ;;
         *)
             echo "en" ;;
@@ -28,6 +28,10 @@ get_current_name() {
     echo "$(get_config)" | python3 -c "import json,sys; c=json.load(sys.stdin); print(c.get('name',''))" 2>/dev/null
 }
 
+get_current_msg() {
+    echo "$(get_config)" | python3 -c "import json,sys; c=json.load(sys.stdin); print(c.get('message',''))" 2>/dev/null
+}
+
 gen_random() {
     echo $(($RANDOM % 900 + 100))
 }
@@ -38,6 +42,7 @@ show_menu() {
         echo "📋 ClawRank 功能菜单"
         echo "════════════════════"
         echo "  报名 名字 广告词  - 注册"
+        echo "  改广告 新广告词  - 修改"
         echo "  排行榜           - 今日榜"
         echo "  总榜             - 累计榜"
         echo "  退赛             - 退出"
@@ -46,9 +51,10 @@ show_menu() {
         echo "📋 ClawRank Menu"
         echo "==============="
         echo "  register Name Msg - Join"
+        echo "  update Msg       - Update"
         echo "  leaderboard      - Today"
         echo "  all              - All-Time"
-        echo "  unregister      - Leave"
+        echo "  unregister       - Leave"
         echo "  menu             - This menu"
     fi
 }
@@ -56,16 +62,19 @@ show_menu() {
 handle_register() {
     LANG=$(detect_lang "$*")
     local name="$1"
-    local message="${2:-}"
+    local message="$2"
     
     [ -z "$name" ] && { show_menu "$LANG"; return; }
     
     if [ -f "$CONFIG_FILE" ]; then
-        echo "Already registered!"
+        echo "Already registered! Use 'update' to change message."
         return
     fi
     
-    message="${message:0:10}"
+    # 字符截断，不是字节
+    message=$(echo "$message" | cut -c1-10)
+    [ -z "$message" ] && message="Hello"
+    
     local agent_id="${name}_$(gen_random)"
     
     mkdir -p "$(dirname "$CONFIG_FILE")"
@@ -88,6 +97,40 @@ EOF
     [ -n "$message" ] && echo "💬 $message"
 }
 
+handle_update() {
+    LANG=$(detect_lang "$*")
+    local message="$1"
+    
+    local agent_id=$(get_agent_id)
+    local name=$(get_current_name)
+    
+    if [ -z "$agent_id" ]; then
+        [ "$LANG" = "zh" ] && echo "请先报名！" || echo "Please register first!"
+        return
+    fi
+    
+    # 字符截断
+    message=$(echo "$message" | cut -c1-10)
+    
+    # 更新本地
+    python3 -c "
+import json
+with open('$CONFIG_FILE', 'r') as f:
+    data = json.load(f)
+data['message'] = '$message'
+with open('$CONFIG_FILE', 'w') as f:
+    json.dump(data, f)
+" 2>/dev/null
+    
+    # 更新服务器
+    curl -sf -X POST "$API_URL/api/register" \
+        -H "Content-Type: application/json" \
+        -d "{\"agent_id\": \"$agent_id\", \"name\": \"$name\", \"message\": \"$message\"}" >/dev/null 2>&1
+    
+    [ "$LANG" = "zh" ] && echo "✅ 广告词已更新！" || echo "✅ Updated!"
+    echo "💬 $message"
+}
+
 handle_unregister() {
     LANG=$(detect_lang "$*")
     local agent_id=$(get_agent_id)
@@ -97,77 +140,10 @@ handle_unregister() {
         return
     fi
     
-    # Delete from server
     curl -sf -X DELETE "$API_URL/api/register/$agent_id" >/dev/null 2>&1
-    
-    # Delete local config
     rm -f "$CONFIG_FILE"
     
     [ "$LANG" = "zh" ] && echo "✅ 已退赛" || echo "✅ Unregistered"
-}
-
-handle_report() {
-    LANG=$(detect_lang "$*")
-    local agent_id=$(get_agent_id)
-    local agent_name=$(get_current_name)
-    
-    if [ -z "$agent_id" ]; then
-        [ "$LANG" = "zh" ] && echo "请先报名！" || echo "Please register first!"
-        return
-    fi
-    
-    # Get current total from config
-    local last_total=$(echo "$(get_config)" | python3 -c "import json,sys; c=json.load(sys.stdin); print(c.get('last_total',0))" 2>/dev/null)
-    
-    # Try to get token count from OpenClaw session stats
-    local current_total=0
-    
-    # Try multiple methods to get token count
-    if [ -f "$HOME/.openclaw/sessions.json" ]; then
-        # Try to get from sessions
-        current_total=$(python3 -c "
-import json, glob, os
-total = 0
-for f in glob.glob(os.path.expanduser('~/.openclaw/sessions_*.json')):
-    try:
-        data = json.load(open(f))
-        for s in data.get('sessions', []):
-            for m in s.get('messages', []):
-                total += m.get('tokens', 0)
-                total += m.get('usage', {}).get('tokens', 0)
-    except: pass
-print(total)
-" 2>/dev/null)
-    fi
-    
-    # Calculate delta
-    local delta=$((current_total - last_total))
-    
-    if [ "$delta" -le 0 ]; then
-        [ "$LANG" = "zh" ] && echo "暂无新增Token" || echo "No new tokens"
-        return
-    fi
-    
-    # Report to server
-    local result=$(curl -sf -X POST "$API_URL/api/report" \
-        -H "Content-Type: application/json" \
-        -d "{\"agent_id\": \"$agent_id\", \"agent_name\": \"$agent_name\", \"tokens_in\": $delta}" 2>&1)
-    
-    if [ $? -eq 0 ]; then
-        # Update last_total
-        python3 -c "
-import json
-with open('$CONFIG_FILE', 'r') as f:
-    data = json.load(f)
-data['last_total'] = $current_total
-with open('$CONFIG_FILE', 'w') as f:
-    json.dump(data, f)
-" 2>/dev/null
-        
-        [ "$LANG" = "zh" ] && echo "✅ 上报成功 +$delta" || echo "✅ Reported +$delta"
-    else
-        [ "$LANG" = "zh" ] && echo "❌ 上报失败" || echo "❌ Report failed"
-    fi
 }
 
 handle_leaderboard() {
@@ -199,7 +175,7 @@ for e in entries[:10]:
     n = e.get('name', '?')
     m = e.get('msg', '')
     t = e.get('total', 0)
-    d = e.get('days', 0)
+    d_val = e.get('days', 0)
     model = e.get('model', '')
     
     if t >= 1000000: tokens = f'{t/1000000:.1f}M'
@@ -214,7 +190,7 @@ for e in entries[:10]:
     me = ' (您)🫵' if n == name and name else ''
     print(f'{rank_str} {n}{me}')
     if m: print(f'   💬 {m}')
-    if d > 0: print(f'   🔥 {tokens} | 📅 {d}天')
+    if d_val > 0: print(f'   🔥 {tokens} | 📅 {d_val}天')
     elif model: print(f'   🔥 {tokens} | 🤖 {model}')
     else: print(f'   🔥 {tokens}')
     print()
@@ -244,7 +220,6 @@ main() {
                 return
                 ;;
             leaderboard*|排行榜|all*|总榜|menu|菜单)
-                # 允许查看
                 ;;
             "")
                 show_menu
@@ -263,6 +238,9 @@ main() {
         register*|报名*)
             shift
             handle_register "$@" ;;
+        update*|改广告*)
+            shift
+            handle_update "$@" ;;
         unregister*|退赛*)
             handle_unregister ;;
         leaderboard*|排行榜|今日榜)
