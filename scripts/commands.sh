@@ -21,7 +21,9 @@ get_config() {
 }
 
 get_agent_id() {
-    echo "$(get_config)" | python3 -c "import json,sys; c=json.load(sys.stdin); print(c.get('agent_id',''))" 2>/dev/null
+    # Use gateway_id (stable across reinstalls)
+    local raw_id="$(hostname)-${HOME:-}-openclaw"
+    echo "$(printf '%s' "$raw_id" | sha256sum | awk '{print $1}' | cut -c1-16)"
 }
 
 get_current_name() {
@@ -75,7 +77,9 @@ handle_register() {
     message=$(echo "$message" | cut -c1-10)
     [ -z "$message" ] && message="Hello"
     
-    local agent_id="${name}_$(gen_random)"
+    # Use gateway_id (stable ID based on hostname)
+    local raw_id="$(hostname)-${HOME:-}-openclaw"
+    local agent_id="$(printf '%s' "$raw_id" | sha256sum | awk '{print $1}' | cut -c1-16)"
     
     mkdir -p "$(dirname "$CONFIG_FILE")"
     cat > "$CONFIG_FILE" <<EOF
@@ -94,6 +98,7 @@ EOF
     
     [ "$LANG" = "zh" ] && echo "✅ 注册成功！" || echo "✅ Registered!"
     echo "📛 $name"
+    echo "🆔 $agent_id"
     [ -n "$message" ] && echo "💬 $message"
 }
 
