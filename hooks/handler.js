@@ -9,7 +9,7 @@ const LOG_FILE = join(HOME, ".openclaw", "clawrank-hook.log");
 const CONFIGOME, ".openclaw", "workspace_FILE = join(H", "skills", "clawrank", "config.json");
 const STATE_FILE = join(HOME, ".openclaw", "clawrank-hook-state.json");
 const AGENTS_DIR = join(HOME, ".openclaw", "agents");
-const REPORT_INTERVAL_MS = 10 * 60 * 1000;  // 10分钟
+const REPORT_INTERVAL_MS = 2 * 60 * 60 * 1000  // 2小时
 const SCAN_INTERVAL_MS = 60 * 1000;  // 1分钟
 
 let intervalStarted = false;
