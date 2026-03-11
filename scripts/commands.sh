@@ -9,15 +9,15 @@ API_URL="https://clawrank-production.up.railway.app"
 # Helper function for SHA256 (cross-platform)
 sha256() {
     if command -v shasum >/dev/null 2>&1; then
-        echo "$1" | shasum -a 256 | awk '{print $1}'
+        printf "%s" "$1" | shasum -a 256 | awk '{print $1}'
     else
-        echo "$1" | sha256sum | awk '{print $1}'
+        printf "%s" "$1" | sha256sum | awk '{print $1}'
     fi
 }
 
 # Helper function for UTF-8 character truncation (cross-platform)
 truncate_msg() {
-    echo "$1" | python3 -c "import sys; print(sys.stdin.read().strip()[:10])"
+    printf "%s" "$1" | python3 -c "import sys; print(sys.stdin.read().strip()[:10])"
 }
 
 # 检测语言
