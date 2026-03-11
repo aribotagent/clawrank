@@ -123,8 +123,8 @@ app.get('/api/leaderboard', (req, res) => {
     const u = d.usage.find(x => x.id === a.id && x.date === t);
     return { 
       id: a.id, 
-      name: a.name, 
-      msg: a.msg, 
+      name: a.name || 'Unknown', 
+      msg: a.msg || '', 
       in: u?.in || 0, 
       out: u?.out || 0, 
       total: (u?.in || 0) + (u?.out || 0), 
