@@ -22,6 +22,7 @@ const globalLimiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: 1,
   message: { error: 'Too many requests, please slow down.' }
 });
 
