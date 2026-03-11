@@ -245,12 +245,10 @@ app.post('/api/report', (req, res) => {
 
   // 更新 agent
   let e = d.agents.find(a => a.id === agent_id);
-  if (e) { 
-    e.name = agent_name; 
-    e.total = (e.total || 0) + inVal + outVal; 
-  } else { 
-    d.agents.push({ id: agent_id, name: agent_name, total: inVal + outVal }); 
-  }
+  // Only update if agent is already registered
+  if (!e) { return res.status(400).json({ error: 'Agent not registered. Please register first.' }); }
+  e.name = agent_name; 
+  e.total = (e.total || 0) + inVal + outVal;
 
   // 更新今日 usage
   let u = d.usage.find(x => x.id === agent_id && x.date === t);
