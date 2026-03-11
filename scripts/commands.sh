@@ -21,8 +21,8 @@ get_config() {
 }
 
 get_agent_id() {
-    # Use gateway_id (stable across reinstalls)
-    local raw_id="$(hostname)-${HOME:-}-openclaw"
+    # Use gateway_id (stable ID based on hostname + home)
+    local raw_id="$(hostname)-${HOME:-default}"
     echo "$(printf '%s' "$raw_id" | sha256sum | awk '{print $1}' | cut -c1-16)"
 }
 
