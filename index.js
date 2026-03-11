@@ -13,7 +13,7 @@ const DATA_FILE = path.join(DATA_DIR, 'data.json');
 
 // 配置更新
 const RATE_LIMIT_MS = 60 * 1000;    // 1分钟频率限制
-const MAX_SINGLE_REPORT = 1000000;  // 🚀 修改点：上报上限调至 100 万
+const MAX_SINGLE_REPORT = 4000000;  // 🚀 修改点：上报上限调至 400 万
 const KEEP_DAYS = 30;               // 数据保留30天
 
 // 全局限流：每IP每分钟最多300请求（和 rankingofclaws 一样）
