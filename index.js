@@ -135,13 +135,14 @@ app.get('/api/leaderboard', (req, res) => {
   res.json({ date: t, type: 'daily', list });
 });
 
-// 总排行榜
+// 总排行榜 - 从注册当天起的累积量
 app.get('/api/leaderboard/all', (req, res) => {
   let d = loadData();
   if (!d) d = initDataFile();
   
   const list = d.agents.map(a => {
-    const us = d.usage.filter(x => x.id === a.id);
+    const registeredAt = a.registered_at || '2020-01-01';
+    const us = d.usage.filter(x => x.id === a.id && x.date >= registeredAt);
     return { 
       id: a.id, 
       name: a.name, 
@@ -165,9 +166,14 @@ app.post('/api/register', (req, res) => {
   let d = loadData();
   if (!d) d = initDataFile();
   
+  const now = new Date().toISOString().split('T')[0];
   const e = d.agents.find(a => a.id === agent_id);
-  if (e) { e.name = name; e.msg = message; } 
-  else { d.agents.push({ id: agent_id, name, msg: message }); }
+  if (e) { 
+    e.name = name; 
+    e.msg = message; 
+  } else { 
+    d.agents.push({ id: agent_id, name, msg: message, registered_at: now }); 
+  }
   saveData(d);
   res.json({ ok: true });
 });
