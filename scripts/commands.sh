@@ -36,7 +36,7 @@ get_config() {
 
 get_agent_id() {
     # Use gateway_id (stable ID based on hostname + home)
-    local raw_id="$(hostname)-${HOME:-default}"
+    local raw_id="$(hostname)-${HOME:-}"
     sha256 "$raw_id" | cut -c1-16
 }
 

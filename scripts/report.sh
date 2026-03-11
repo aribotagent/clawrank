@@ -62,7 +62,7 @@ cfg = load_config()
 
 # 生成 gateway_id
 def get_gateway_id():
-    raw = f"{os.uname().nodename}-{os.environ.get('HOME','')}-openclaw"
+    raw = f"{os.uname().nodename}-{os.environ.get('HOME','')}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 gateway_id = cfg.get("gateway_id") or get_gateway_id()
