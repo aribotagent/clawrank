@@ -178,5 +178,5 @@ for body in payloads:
     if p.returncode == 0:
         print(f"reported {body['tokens_delta']} tokens model={body['model']}")
     else:
-        print(f"failed model={body['model']} code={p.returncode}: {p.stderr}", file=sys.stderr)
+        print(f"failed: {p.stderr.strip()[:100]}")
 PY
