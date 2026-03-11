@@ -185,11 +185,17 @@ app.post('/api/register', (req, res) => {
 
 // 退赛
 app.delete('/api/register/:id', (req, res) => {
+  const id = req.params.id;
   let d = loadData();
   if (!d) d = initDataFile();
-  d.agents = d.agents.filter(a => a.id !== req.params.id);
+  
+  // Remove agent
+  d.agents = d.agents.filter(a => a.id !== id);
+  // Also remove usage records for this agent
+  d.usage = d.usage.filter(u => u.id !== id);
+  
   saveData(d);
-  res.json({ ok: true });
+  res.json({ ok: true, deleted_id: id });
 });
 
 // 上报 Token
