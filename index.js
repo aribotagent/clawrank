@@ -167,13 +167,24 @@ app.post('/api/register', (req, res) => {
   if (!d) d = initDataFile();
   
   const now = new Date().toISOString().split('T')[0];
-  const e = d.agents.find(a => a.id === agent_id);
-  if (e) { 
-    e.name = name; 
-    e.msg = message; 
-  } else { 
-    d.agents.push({ id: agent_id, name, msg: message, registered_at: now }); 
+  
+  // Check if this name already exists (dedup by name)
+  const existingByName = d.agents.find(a => a.name === name);
+  if (existingByName) {
+    // Update existing entry (keeps token history)
+    existingByName.id = agent_id;
+    existingByName.msg = message;
+  } else {
+    // Check if agent_id already exists
+    const e = d.agents.find(a => a.id === agent_id);
+    if (e) {
+      e.name = name;
+      e.msg = message;
+    } else {
+      d.agents.push({ id: agent_id, name, msg: message, registered_at: now });
+    }
   }
+  
   saveData(d);
   res.json({ ok: true });
 });
@@ -264,3 +275,27 @@ app.get('/api/stats', (req, res) => {
 });
 
 app.listen(PORT, () => console.log('Clawrank on ' + PORT));
+
+// Cleanup duplicates - keep entry with highest token count
+app.post('/api/cleanup', (req, res) => {
+  let d = loadData();
+  if (!d) d = initDataFile();
+  
+  const nameCount = {};
+  const toRemove = [];
+  
+  // Find duplicates by name
+  for (const a of d.agents) {
+    if (nameCount[a.name]) {
+      toRemove.push(a.id);
+    } else {
+      nameCount[a.name] = a.id;
+    }
+  }
+  
+  // Remove duplicates
+  d.agents = d.agents.filter(a => !toRemove.includes(a.id));
+  saveData(d);
+  
+  res.json({ ok: true, removed: toRemove.length });
+});
