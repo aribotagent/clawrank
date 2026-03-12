@@ -159,7 +159,7 @@ import json
 import subprocess
 import sys
 
-payloads = json.loads(sys.argv[1])
+payloads = json.loads(sys.stdin.read())
 api_url = sys.argv[2]
 
 for body in payloads:
