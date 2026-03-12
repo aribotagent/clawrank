@@ -154,7 +154,7 @@ if [ "$PAYLOADS" = "[]" ] || [ -z "$PAYLOADS" ]; then
 fi
 
 # Send report
-python3 "$PAYLOADS" "$API_URL" <<'PY'
+python3 - "$PAYLOADS" "$API_URL" <<.PY'
 import json
 import subprocess
 import sys
