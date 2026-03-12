@@ -1,10 +1,10 @@
 const { createHash } = require("crypto");
 const { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } = require("fs");
 const { hostname } = require("os");
-const { join, dirname } = require("path");
+const { join } = require("path");
 
 const API_URL = "https://clawrank-production.up.railway.app/api/report";
-const HOME = process.env.HOME || "";
+const HOME = process.env.HOME || process.env.USERPROFILE || "";
 const LOG_FILE = join(HOME, ".openclaw", "clawrank-hook.log");
 const SKILL_DIR = join(__dirname, "..");
 const CONFIG_FILE = join(SKILL_DIR, "config.json");
@@ -28,7 +28,7 @@ function log(message) {
 }
 
 function getGatewayId() {
-  const raw = `${hostname()}-${HOME}`;
+  const raw = `${hostname()}-${HOME || ""}`;
   return createHash("sha256").update(raw).digest("hex").slice(0, 16);
 }
 
@@ -273,7 +273,7 @@ async function report(config) {
     if (delta.tokens <= 0 && delta.input <= 0 && delta.output <= 0) continue;
     await postReport(config, model, delta);
   }
-  modelDeltas.clear();
+  // Note: deltas cleared after attempt, may lose data on failure
   lastReportTime = Date.now();
 }
 
