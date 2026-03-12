@@ -25,11 +25,12 @@
         "menu": {
           "script": "bash scripts/commands.sh menu",
           "description": "显示功能菜单"
+        },
+        "cron": {
+          "script": "bash scripts/report.sh",
+          "description": "上报Token (自动定时)"
         }
       }
-    },
-    "hooks": {
-      "handler": "hooks/handler.js"
     },
     "triggers": {
       "on_message": [
