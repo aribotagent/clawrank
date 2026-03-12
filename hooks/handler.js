@@ -1,20 +1,23 @@
 const { createHash } = require("crypto");
 const { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } = require("fs");
 const { hostname } = require("os");
-const { join } = require("path");
+const { join, dirname } = require("path");
 
 const API_URL = "https://clawrank-production.up.railway.app/api/report";
 const HOME = process.env.HOME || "";
 const LOG_FILE = join(HOME, ".openclaw", "clawrank-hook.log");
 const SKILL_DIR = join(__dirname, "..");
 const CONFIG_FILE = join(SKILL_DIR, "config.json");
-const STATE_FILE = join(HOME, ".openclaw", "labor-leaderboard-state.json");
+// Use separate state file for hook (incompatible with report.sh)
+const STATE_FILE = join(HOME, ".openclaw", "clawrank-hook-state.json");
 const AGENTS_DIR = join(HOME, ".openclaw", "agents");
-const REPORT_INTERVAL_MS = 2 * 60 * 60 * 1000  // 2小时
+const REPORT_INTERVAL_MS = 2 * 60 * 60 * 1000;  // 2小时
 const SCAN_INTERVAL_MS = 60 * 1000;  // 1分钟
+const RATE_LIMIT_MS = 60 * 1000;  // 1分钟
 
 let intervalStarted = false;
 let lastReportTime = 0;
+let lastRateLimitTime = 0;
 const modelDeltas = new Map();
 let lastSeenByFile = new Map();
 
@@ -43,7 +46,7 @@ function loadConfig() {
     const parsed = JSON.parse(readFileSync(CONFIG_FILE, "utf8"));
     if (!parsed || !parsed.name) return null;
     return {
-      agent_name: String(parsed.name).trim(),
+      name: parsed.name,
       message: parsed.message || "",
       agent_id: parsed.agent_id || getGatewayId(),
       registered_at: parsed.registered_at || new Date().toISOString(),
@@ -51,17 +54,44 @@ function loadConfig() {
   } catch (_) { return null; }
 }
 
-function registerFallback() {
+async function registerToApi(config) {
+  try {
+    const res = await fetch(API_URL.replace("/report", "/register"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        agent_id: config.agent_id,
+        name: config.name,
+        message: config.message,
+      }),
+    });
+    if (res.ok) {
+      log(`Registered to API: ${config.name}`);
+      return true;
+    }
+    log(`Register failed: ${res.status}`);
+    return false;
+  } catch (err) {
+    log(`Register error: ${err.message}`);
+    return false;
+  }
+}
+
+async function registerFallback() {
+  const name = hostname() || "anonymous";
+  const agent_id = getGatewayId();
   const config = {
-    agent_name: hostname() || "anonymous",
+    name: name,
     message: "",
-    agent_id: getGatewayId(),
+    agent_id: agent_id,
     registered_at: new Date().toISOString(),
   };
   try {
     ensureDir(SKILL_DIR);
     writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf8");
     log(`Created fallback config at ${CONFIG_FILE}`);
+    // Try to register to API
+    await registerToApi(config);
   } catch (err) {
     log(`Failed creating fallback config: ${err.message}`);
   }
@@ -79,7 +109,7 @@ function listAgentIds() {
 
 function getRecentJsonlFiles() {
   const files = [];
-  const cutoff = Date.now() - (24 * 60 * 60 * 1000);  // 24小时内
+  const cutoff = Date.now() - (24 * 60 * 60 * 1000);
   for (const agentId of listAgentIds()) {
     const sessionsDir = join(AGENTS_DIR, agentId, "sessions");
     if (!existsSync(sessionsDir)) continue;
@@ -201,9 +231,15 @@ function hasPendingDeltas() {
 }
 
 async function postReport(config, model, delta) {
+  // Check rate limit
+  if (Date.now() - lastRateLimitTime < RATE_LIMIT_MS) {
+    log(`Rate limited, skip ${model}`);
+    return false;
+  }
+  
   const body = {
     agent_id: config.agent_id,
-    agent_name: config.agent_name,
+    agent_name: config.name,
     tokens_in: delta.input,
     tokens_out: delta.output,
     model,
@@ -214,11 +250,19 @@ async function postReport(config, model, delta) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const ok = res.ok;
-    log(`Report model=${model} status=${res.status} tokens=${delta.input + delta.output}`);
-    return ok;
+    if (res.status === 429) {
+      lastRateLimitTime = Date.now();
+      log(`Rate limited (429), will retry later`);
+      return false;
+    }
+    if (res.ok) {
+      log(`Reported ${model}: ${delta.input + delta.output} tokens`);
+      return true;
+    }
+    log(`Report failed: ${res.status}`);
+    return false;
   } catch (err) {
-    log(`Report failed: ${err.message}`);
+    log(`Report error: ${err.message}`);
     return false;
   }
 }
@@ -258,7 +302,7 @@ function startPeriodicReporting(config) {
 
 module.exports = async function handler(event) {
   log(`Event: type=${event?.type} action=${event?.action}`);
-  const config = loadConfig() || registerFallback();
+  const config = loadConfig() || await registerFallback();
   
   if (event?.type === "gateway" && event?.action === "startup") {
     startPeriodicReporting(config);
