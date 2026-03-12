@@ -124,7 +124,8 @@ app.get('/api/leaderboard', (req, res) => {
     return { 
       id: a.id, 
       name: a.name || 'Unknown', 
-      msg: a.msg || '', 
+      msg: a.msg || '',
+      twitter: a.twitter || '', 
       in: u?.in || 0, 
       out: u?.out || 0, 
       total: (u?.in || 0) + (u?.out || 0), 
