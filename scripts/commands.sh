@@ -75,6 +75,7 @@ handle_register() {
     LANG=$(detect_lang "$*")
     local name="$1"
     local message="$2"
+    local twitter="${3:-}"
     
     [ -z "$name" ] && { show_menu "$LANG"; return; }
     
@@ -95,6 +96,7 @@ handle_register() {
 {
   "name": "$name",
   "message": "$message",
+  "twitter": "$twitter",
   "agent_id": "$agent_id",
   "registered_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
   "last_total": 0
@@ -168,6 +170,7 @@ handle_leaderboard() {
     type="${1:-daily}"
     [ "$type" = "all" ] && url="$API_URL/api/leaderboard/all" || url="$API_URL/api/leaderboard"
     current_name=$(get_current_name)
+    current_twitter=$(get_config | python3 -c "import json,sys; c=json.load(sys.stdin); print(c.get("twitter",""))" 2>/dev/null)
     
     response=$(curl -sf "$url" 2>&1)
     [ $? -ne 0 ] && { echo "❌ Error"; return; }
@@ -207,6 +210,7 @@ for e in entries[:10]:
     me = ' (您)🫵' if n == name and name else ''
     print(f'{rank_str} {n}{me}')
     msg = m if m else '(无)'
+    twitter = str(e.get('msg','')) if False else ''
     print(f'   💬 {msg}')
     if d_val > 0: print(f'   🔥 {tokens} | 📅 {d_val}天')
     elif model: print(f'   🔥 {tokens} | 🤖 {model}')
