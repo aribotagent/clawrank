@@ -206,7 +206,8 @@ for e in entries[:10]:
     
     me = ' (您)🫵' if n == name and name else ''
     print(f'{rank_str} {n}{me}')
-    if m: print(f'   💬 {m}')
+    msg = m if m else '(无)'
+    print(f'   💬 {msg}')
     if d_val > 0: print(f'   🔥 {tokens} | 📅 {d_val}天')
     elif model: print(f'   🔥 {tokens} | 🤖 {model}')
     else: print(f'   🔥 {tokens}')
