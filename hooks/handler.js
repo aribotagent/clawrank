@@ -6,7 +6,8 @@ const { join } = require("path");
 const API_URL = "https://clawrank-production.up.railway.app/api/report";
 const HOME = process.env.HOME || "";
 const LOG_FILE = join(HOME, ".openclaw", "clawrank-hook.log");
-const CONFIG_FILE = join(HOME, ".openclaw", "workspace", "skills", "clawrank", "config.json");
+const SKILL_DIR = join(__dirname, "..");
+const CONFIG_FILE = join(SKILL_DIR, "config.json");
 const STATE_FILE = join(HOME, ".openclaw", "labor-leaderboard-state.json");
 const AGENTS_DIR = join(HOME, ".openclaw", "agents");
 const REPORT_INTERVAL_MS = 2 * 60 * 60 * 1000  // 2小时
@@ -58,7 +59,7 @@ function registerFallback() {
     registered_at: new Date().toISOString(),
   };
   try {
-    ensureDir(join(HOME, ".openclaw", "workspace", "skills", "clawrank"));
+    ensureDir(SKILL_DIR);
     writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf8");
     log(`Created fallback config at ${CONFIG_FILE}`);
   } catch (err) {
