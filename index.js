@@ -159,7 +159,7 @@ app.get('/api/leaderboard/all', (req, res) => {
 
 // 报名
 app.post('/api/register', (req, res) => {
-  const { agent_id, name, message } = req.body;
+  const { agent_id, name, message, twitter } = req.body;
   if (!agent_id || !name) return res.status(400).json({ error: 'Missing agent_id or name' });
   if (message && message.length > 15) return res.status(400).json({ error: 'Message too long' });
   
@@ -176,7 +176,8 @@ app.post('/api/register', (req, res) => {
     e.msg = message;
   } else {
     // New registration
-    d.agents.push({ id: agent_id, name, msg: message, registered_at: now });
+    d.agents.push({ id: agent_id, name, msg: message,
+    twitter: twitter || "", registered_at: now });
   }
   
   saveData(d);
