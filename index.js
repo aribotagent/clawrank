@@ -182,7 +182,7 @@ app.post('/api/register', (req, res) => {
   }
   
   saveData(d);
-  res.json({ ok: true });
+  res.json({ ok: true, total: e.total, delta: inVal + outVal });
 });
 
 // 退赛
@@ -264,7 +264,7 @@ app.post('/api/report', (req, res) => {
   saveData(d);
   agentRateLimit.set(agent_id, now);
   
-  res.json({ ok: true });
+  res.json({ ok: true, total: e.total, delta: inVal + outVal });
 });
 
 // 统计
