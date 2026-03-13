@@ -67,7 +67,10 @@ for f in glob.glob(f'{home}/.openclaw/agents/*/sessions/*.jsonl'):
                 if isinstance(msg, dict) and msg.get('role') == 'assistant':
                     usage = msg.get('usage', {})
                     if usage:
+                        # Try totalTokens first, then total, then input+output
                         t = usage.get('totalTokens', usage.get('total', 0))
+                        if not isinstance(t, (int, float)) or t <= 0:
+                            t = usage.get('input', 0) + usage.get('output', 0)
                         total += t if isinstance(t, (int, float)) else 0
             except: pass
     except: pass
