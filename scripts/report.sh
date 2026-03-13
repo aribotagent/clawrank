@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
-# ClawRank Token Reporter - Simplified to total only
+# ClawRank Token Reporter - with sync, logging and verification
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_FILE="$SKILL_DIR/config.json"
 STATE_FILE="${HOME}/.openclaw/labor-leaderboard-state.json"
+LOG_FILE="${HOME}/.openclaw/clawrank-report.log"
 API_URL="${LEADERBOARD_URL:-https://clawrank-production.up.railway.app}"
 
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+}
+
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "ClawRank: python3 is required."
-  exit 1
+    log "ERROR: python3 is required."
+    exit 1
 fi
 
-# Generate payload
+# Generate payload with sync from server if needed
 PAYLOADS="$(
-python3 - "$CONFIG_FILE" "$STATE_FILE" <<'PY'
+python3 - "$CONFIG_FILE" "$STATE_FILE" "$API_URL" <<'PY'
 import json
 import os
 import sys
@@ -24,6 +29,7 @@ from datetime import datetime
 
 config_file = Path(sys.argv[1])
 state_file = Path(sys.argv[2])
+api_url = sys.argv[3]
 home = Path(os.environ.get("HOME", ""))
 
 def safe_num(v):
@@ -57,7 +63,6 @@ gateway_id = cfg.get("agent_id") or get_gateway_id()
 agent_name = cfg.get("name") or cfg.get("agent_name", os.uname().nodename)
 message = cfg.get("message", "")
 
-# Get registered_at timestamp
 registered_at = cfg.get("registered_at")
 registered_ts = 0
 if registered_at:
@@ -77,6 +82,21 @@ if state_file.exists():
     except:
         pass
 
+# Sync from server if first run (prev_total = 0)
+if prev_total == 0:
+    try:
+        import urllib.request
+        req = urllib.request.Request(f"{api_url}/api/leaderboard")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+            for entry in data.get("list", []):
+                if entry.get("id") == gateway_id:
+                    prev_total = safe_num(entry.get("total", 0))
+                    print(f"[SYNC] Server total: {prev_total}", file=sys.stderr)
+                    break
+    except Exception as e:
+        print(f"[SYNC] Failed: {e}", file=sys.stderr)
+
 # Scan JSONL files after registered_at
 agents_dir = home / ".openclaw" / "agents"
 current_total = 0
@@ -88,7 +108,6 @@ if agents_dir.exists():
             continue
         for file in sessions.glob("*.jsonl"):
             try:
-                # Skip files modified before registration
                 if registered_ts > 0:
                     mtime = file.stat().st_mtime * 1000
                     if mtime < registered_ts:
@@ -103,7 +122,6 @@ if agents_dir.exists():
                         except:
                             continue
                         
-                        # Extract message
                         msg = None
                         if isinstance(obj, dict):
                             msg = obj.get("message")
@@ -149,15 +167,15 @@ PY
 )"
 
 if [ "$PAYLOADS" = "[]" ] || [ -z "$PAYLOADS" ]; then
-  echo "ClawRank: no new tokens."
-  exit 0
+    log "No new tokens to report."
+    exit 0
 fi
 
-# Send report
-python3 - "$PAYLOADS" "$API_URL" <<'PY'
+# Send report and verify
+RESPONSE=$(python3 - "$PAYLOADS" "$API_URL" <<'PY'
 import json
-import subprocess
 import sys
+import subprocess
 
 payloads = json.loads(sys.argv[1])
 api_url = sys.argv[2]
@@ -170,9 +188,17 @@ for body in payloads:
          "-d", json.dumps(body, separators=(",", ":"))],
         capture_output=True, text=True
     )
-    if p.returncode == 0 and p.stdout.strip():
-        print(f"Reported: {total} tokens")
+    if p.returncode == 0:
+        try:
+            result = json.loads(p.stdout)
+            server_total = result.get("total", 0)
+            delta_applied = result.get("delta", 0)
+            print(f"SUCCESS: delta={total}, server_total={server_total}, delta_applied={delta_applied}")
+        except:
+            print(f"SUCCESS: delta={total}")
     else:
-        if p.returncode != 0:
-            print(f"Failed: {p.stderr.strip()[:100]}")
+        print(f"FAILED: {p.stderr.strip()[:100]}")
 PY
+)
+
+log "Report: $RESPONSE"
