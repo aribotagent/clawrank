@@ -170,8 +170,9 @@ for body in payloads:
          "-d", json.dumps(body, separators=(",", ":"))],
         capture_output=True, text=True
     )
-    if p.returncode == 0:
+    if p.returncode == 0 and p.stdout.strip():
         print(f"Reported: {total} tokens")
     else:
-        print(f"Failed: {p.stderr.strip()[:100]}")
+        if p.returncode != 0:
+            print(f"Failed: {p.stderr.strip()[:100]}")
 PY
