@@ -118,7 +118,7 @@ app.get('/api/leaderboard', (req, res) => {
   let d = loadData();
   if (!d) d = initDataFile();
   
-  const t = today();
+  const t = req.query.date || today();
   const list = d.agents.map(a => {
     const u = d.usage.find(x => x.id === a.id && x.date === t);
     return { 
