@@ -55,11 +55,7 @@ reg_ts = $REGISTERED_AT
 
 for f in glob.glob(f'{home}/.openclaw/agents/*/sessions/*.jsonl'):
     try:
-        # Skip files before registration
-        if reg_ts > 0:
-            mtime = os.path.getmtime(f) * 1000
-            if mtime < reg_ts:
-                continue
+        # Note: We don't filter by mtime since we track delta from state file
         for line in open(f):
             try:
                 obj = json.loads(line)
