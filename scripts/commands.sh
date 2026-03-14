@@ -150,6 +150,45 @@ with open('$CONFIG_FILE', 'w') as f:
     echo "💬 $message"
 }
 
+
+handle_update() {
+    LANG=$(detect_lang "$*")
+    local message="$1"
+    local twitter="$2"
+    
+    local agent_id=$(get_agent_id)
+    local name=$(get_current_name)
+    
+    if [ -z "$agent_id" ]; then
+        [ "$LANG" = "zh" ] && echo "请先报名！" || echo "Please register first!"
+        return
+    fi
+    
+    # Update message
+    message=$(echo "$message" | cut -c1-10)
+    twitter=$(echo "$twitter" | cut -c1-15)
+    
+    python3 -c "
+import json
+with open('$CONFIG_FILE', 'r') as f:
+    data = json.load(f)
+data['message'] = '$message'
+data['twitter'] = '$twitter'
+with open('$CONFIG_FILE', 'w') as f:
+    json.dump(data, f)
+" 2>/dev/null
+    
+    # Update server
+    curl -sf -X POST "$API_URL/api/register" \
+        -H "Content-Type: application/json" \
+        -d "{\"agent_id\": \"$agent_id\", \"name\": \"$name\", \"message\": \"$message\", \"twitter\": \"$twitter\"}" >/dev/null 2>&1
+    
+    [ "$LANG" = "zh" ] && echo "✅ 已更新！" || echo "✅ Updated!"
+    echo "💬 $message"
+    [ -n "$twitter" ] && echo "🐦 $twitter"
+}
+
+
 handle_unregister() {
     LANG=$(detect_lang "$*")
     local agent_id=$(get_agent_id)
@@ -211,7 +250,9 @@ for e in entries[:10]:
     print(f'{rank_str} {n}{me}')
     msg = m if m else '(无)'
     twitter = str(e.get('msg','')) if False else ''
+    twitter = e.get('twitter', '')
     print(f'   💬 {msg}')
+    if twitter: print(f'   🐦 {twitter}')
     if d_val > 0: print(f'   🔥 {tokens} | 📅 {d_val}天')
     elif model: print(f'   🔥 {tokens} | 🤖 {model}')
     else: print(f'   🔥 {tokens}')
@@ -231,6 +272,21 @@ elif user_rank is None:
 }
 
 main() {
+
+# Auto-setup OpenClaw cron for reporting
+CRON_JOB_ID="clawrank-auto-report"
+if ! openclaw cron list 2>/dev/null | grep -q "$CRON_JOB_ID"; then
+    openclaw cron add -n "$CRON_JOB_ID" --every 2h "bash $SCRIPT_DIR/report.sh" 2>/dev/null || true
+fi
+
+
+
+# Auto-repair cron if missing
+if ! crontab -l 2>/dev/null | grep -q "clawrank"; then
+    bash "$SCRIPT_DIR/setup-cron.sh" 2>/dev/null
+fi
+
+
     input="$*"
     
     # 首次使用引导
