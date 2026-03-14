@@ -57,7 +57,7 @@ app.get('/api/leaderboard', (req, res) => {
   const t = today();
   const list = d.agents.map(a => {
     const u = d.usage.find(x => x.id === a.id && x.date === t);
-    return { id: a.id, name: a.name, msg: a.msg, twitter: a.twitter || '', in: u?.in || 0, out: u?.out || 0, total: (u?.in || 0) + (u?.out || 0), model: u?.model || '' };
+    return { id: a.id, name: a.name, msg: a.msg || "", twitter: a.twitter || '', in: u?.in || 0, out: u?.out || 0, total: (u?.in || 0) + (u?.out || 0), model: u?.model || '' };
   }).sort((a, b) => b.total - a.total).map((r, i) => ({ rank: i + 1, ...r }));
   res.json({ date: t, type: 'daily', list });
 });
@@ -66,7 +66,7 @@ app.get('/api/leaderboard/all', (req, res) => {
   const d = load();
   const list = d.agents.map(a => {
     const us = d.usage.filter(x => x.id === a.id);
-    return { id: a.id, name: a.name, msg: a.msg, in: us.reduce((s, x) => s + (x.in || 0), 0), out: us.reduce((s, x) => s + (x.out || 0), 0), total: us.reduce((s, x) => s + (x.in || 0) + (x.out || 0), 0), days: us.length };
+    return { id: a.id, name: a.name, msg: a.msg || "", in: us.reduce((s, x) => s + (x.in || 0), 0), out: us.reduce((s, x) => s + (x.out || 0), 0), total: us.reduce((s, x) => s + (x.in || 0) + (x.out || 0), 0), days: us.length };
   }).sort((a, b) => b.total - a.total).map((r, i) => ({ rank: i + 1, ...r }));
   res.json({ type: 'all', list });
 });
