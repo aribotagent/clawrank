@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ClawRank Token Reporter - Fixed version
+# ClawRank Token Reporter
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -77,16 +77,33 @@ if [ "$DELTA" -le 0 ]; then
     exit 0
 fi
 
-log "Reporting $DELTA tokens..."
+# Handle large delta - cap at 4M and carry over remainder
+REPORT_TOKENS=$DELTA
+REMAINDER=0
+if [ "$DELTA" -gt 4000000 ]; then
+    REPORT_TOKENS=4000000
+    REMAINDER=$((DELTA - 4000000))
+    log "Delta $DELTA exceeds limit, reporting 4M, carrying over $REMAINDER"
+fi
+
+log "Reporting $REPORT_TOKENS tokens..."
 
 RESULT=$(curl -s -X POST "$API_URL/api/report" \
     -H "Content-Type: application/json" \
-    -d "{\"agent_id\": \"$AGENT_ID\", \"agent_name\": \"$AGENT_NAME\", \"tokens_in\": $DELTA}")
+    -d "{\"agent_id\": \"$AGENT_ID\", \"agent_name\": \"$AGENT_NAME\", \"tokens_in\": $REPORT_TOKENS}")
 
 if echo "$RESULT" | python3 -c "import json,sys; exit(0 if json.load(sys.stdin).get('ok') else 1)"; then
-    SERVER_TOTAL=$(echo "$RESULT" | python3 -c "import json,sys: print(json.load(sys.stdin).get('total',0))")
-    echo "{\"total\": $CURRENT, \"time\": $(date +%s)000}" > "$STATE_FILE"
-    log "Success! Reported $DELTA, server total: $SERVER_TOTAL"
+    SERVER_TOTAL=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('total',0))")
+    
+    # Save state - if there's remainder, save (CURRENT - REMAINDER) as previous
+    if [ "$REMAINDER" -gt 0 ]; then
+        NEW_PREV=$((CURRENT - REMAINDER))
+        echo "{\"total\": $NEW_PREV, \"time\": $(date +%s)000}" > "$STATE_FILE"
+        log "Success! Reported $REPORT_TOKENS, saved state for next run. Server total: $SERVER_TOTAL"
+    else
+        echo "{\"total\": $CURRENT, \"time\": $(date +%s)000}" > "$STATE_FILE"
+        log "Success! Reported $REPORT_TOKENS, server total: $SERVER_TOTAL"
+    fi
 else
     log "Failed: $RESULT"
 fi
