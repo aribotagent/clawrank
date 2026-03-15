@@ -14,6 +14,21 @@ app.use(express.json());
 
 function load() { try { return fs.existsSync(DATA_FILE) ? JSON.parse(fs.readFileSync(DATA_FILE)) : { agents: [], usage: [] }; } catch { return { agents: [], usage: [] }; } }
 function save(d) { fs.writeFileSync(DATA_FILE, JSON.stringify(d)); }
+
+function saveDailySnapshot(d) {
+  const t = today();
+  if (!d.snapshots) d.snapshots = {};
+  const list = d.agents.map(a => {
+    const u = d.usage.find(x => x.id === a.id && x.date === t);
+    return { id: a.id, name: a.name, msg: a.msg || "", twitter: a.twitter || "", total: (u?.in || 0) + (u?.out || 0) };
+  }).sort((a, b) => b.total - a.total);
+  d.snapshots[t] = list;
+  // Keep only last 30 days
+  const dates = Object.keys(d.snapshots).sort().reverse();
+  if (dates.length > 30) {
+    dates.slice(30).forEach(d => delete d.snapshots[d]);
+  }
+}
 function today() { return new Date().toISOString().split('T')[0]; }
 
 app.post('/api/register', (req, res) => {
@@ -22,14 +37,14 @@ app.post('/api/register', (req, res) => {
   const d = load();
   const e = d.agents.find(a => a.id === agent_id);
   if (e) { e.name = name; e.msg = message; e.twitter = twitter || ''; } else { d.agents.push({ id: agent_id, name, msg: message, twitter: twitter || '' }); }
-  save(d);
+  save(d); saveDailySnapshot(d);
   res.json({ ok: true });
 });
 
 app.delete('/api/register/:id', (req, res) => {
   const d = load();
   d.agents = d.agents.filter(a => a.id !== req.params.id);
-  save(d);
+  save(d); saveDailySnapshot(d);
   res.json({ ok: true });
 });
 
@@ -48,7 +63,7 @@ app.post('/api/report', (req, res) => {
   let u = d.usage.find(x => x.id === agent_id && x.date === t);
   if (u) { u.in = (u.in || 0) + inC; u.out = (u.out || 0) + outC; } else { d.usage.push({ id: agent_id, date: t, in: inC, out: outC, model }); }
 
-  save(d);
+  save(d); saveDailySnapshot(d);
   res.json({ ok: true, total: e ? e.total : inC + outC, delta: inC + outC });
 });
 
@@ -74,4 +89,20 @@ app.get('/api/leaderboard/all', (req, res) => {
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/stats', (req, res) => { const d = load(); res.json({ total: d.agents.length }); });
 
+
+
+app.get('/api/leaderboard/:date', (req, res) => {
+  const d = load();
+  const date = req.params.date;
+  if (date && d.snapshots && d.snapshots[date]) {
+    res.json({ date, type: 'snapshot', list: d.snapshots[date] });
+    return;
+  }
+  const t = today();
+  const list = d.agents.map(a => {
+    const u = d.usage.find(x => x.id === a.id && x.date === t);
+    return { id: a.id, name: a.name, msg: a.msg || "", twitter: a.twitter || '', in: u?.in || 0, out: u?.out || 0, total: (u?.in || 0) + (u?.out || 0), model: u?.model || '' };
+  }).sort((a, b) => b.total - a.total).map((r, i) => ({ rank: i + 1, ...r }));
+  res.json({ date: t, type: 'daily', list });
+});
 app.listen(PORT, () => console.log('Clawrank running on ' + PORT));
