@@ -120,7 +120,7 @@ EOF
     
     curl -sf -X POST "$API_URL/api/register" \
         -H "Content-Type: application/json" \
-        -d "{\"agent_id\": \"$agent_id\", \"name\": \"$name\", \"message\": \"$message\"}" >/dev/null 2>&1
+        -d "{\"agent_id\": \"$agent_id\", \"name\": \"$name\", \"message\": \"$message\", \"twitter\": \"$twitter\"}" >/dev/null 2>&1
     
     [ "$LANG" = "zh" ] && echo "✅ 注册成功！" || echo "✅ Registered!"
     echo "📛 $name"
