@@ -23,14 +23,14 @@ app.post('/api/register', (req, res) => {
   const e = d.agents.find(a => a.id === agent_id);
   if (e) { e.name = name; e.msg = message; e.twitter = twitter || ''; } else { d.agents.push({ id: agent_id, name, msg: message, twitter: twitter || '' }); }
   save(d);
-  res.json({ ok: true, total: e ? e.total : inC + outC, delta: inC + outC });
+  res.json({ ok: true });
 });
 
 app.delete('/api/register/:id', (req, res) => {
   const d = load();
   d.agents = d.agents.filter(a => a.id !== req.params.id);
   save(d);
-  res.json({ ok: true, total: e ? e.total : inC + outC, delta: inC + outC });
+  res.json({ ok: true });
 });
 
 app.post('/api/report', (req, res) => {
