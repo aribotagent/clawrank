@@ -30,35 +30,41 @@ else: print(0)
 
 log "Registered at: $REG_TS"
 
-# Count tokens from all agents after registration
+# Get tokens from sessions.json with cumulative tracking
 CURRENT=$(python3 -c "
-import json,glob,os,datetime
-total=0
-home=os.environ.get('HOME','')
-reg_ts=float($REG_TS) if $REG_TS else 0
+import json, os
+home = os.environ.get('HOME', '')
+state_file = os.environ.get('STATE_FILE', '')
 
-for f in glob.glob(f'{home}/.openclaw/agents/*/sessions/*.jsonl'):
+# Get current session tokens from all agents
+session_total = 0
+for agent_dir in ['main', 'xander', 'eva', 'frank', 'cci', 'cci_assistant']:
+    sessions_file = f'{home}/.openclaw/agents/{agent_dir}/sessions/sessions.json'
     try:
-        for line in open(f):
-            try:
-                obj=json.loads(line)
-                ts=obj.get('timestamp','')
-                if ts and reg_ts>0:
-                    try:
-                        rt=datetime.datetime.fromisoformat(ts.replace('Z','+00:00')).timestamp()
-                        if rt<reg_ts: continue
-                    except: pass
-                msg=obj.get('message',{})
-                if isinstance(msg,dict) and msg.get('role')=='assistant':
-                    u=msg.get('usage',{})
-                    if u:
-                        t=u.get('totalTokens',u.get('total',0))
-                        if not isinstance(t,(int,float))or t<=0:
-                            t=u.get('input',0)+u.get('output',0)
-                        total+=t if isinstance(t,(int,float))else 0
-            except:pass
-    except:pass
-print(total)
+        with open(sessions_file) as f:
+            data = json.load(f)
+        for key, session in data.items():
+            tokens = session.get('totalTokens', 0)
+            if tokens:
+                session_total += tokens
+    except: pass
+
+# Get previous cumulative from state
+prev_cumulative = 0
+try:
+    with open(state_file) as f:
+        state = json.load(f)
+    prev_cumulative = state.get('cumulative', 0)
+except: pass
+
+# If sessions were reset (current < prev), keep previous cumulative
+# Otherwise use current session total
+if session_total >= prev_cumulative:
+    cumulative = session_total
+else:
+    cumulative = prev_cumulative
+
+print(cumulative)
 ")
 
 # Get previous
@@ -98,10 +104,10 @@ if echo "$RESULT" | python3 -c "import json,sys; exit(0 if json.load(sys.stdin).
     # Save state - if there's remainder, save (CURRENT - REMAINDER) as previous
     if [ "$REMAINDER" -gt 0 ]; then
         NEW_PREV=$((CURRENT - REMAINDER))
-        echo "{\"total\": $NEW_PREV, \"time\": $(date +%s)000}" > "$STATE_FILE"
+        echo "{\"total\": $NEW_PREV, \"time\": $(date +%s)000, \"cumulative\": $CURRENT}" > "$STATE_FILE"
         log "Success! Reported $REPORT_TOKENS, saved state for next run. Server total: $SERVER_TOTAL"
     else
-        echo "{\"total\": $CURRENT, \"time\": $(date +%s)000}" > "$STATE_FILE"
+        echo "{\"total\": $CURRENT, \"time\": $(date +%s)000, \"cumulative\": $CURRENT}" > "$STATE_FILE"
         log "Success! Reported $REPORT_TOKENS, server total: $SERVER_TOTAL"
     fi
 else
