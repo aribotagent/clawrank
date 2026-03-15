@@ -43,7 +43,7 @@ app.post('/api/report', (req, res) => {
   const t = today();
 
   let e = d.agents.find(a => a.id === agent_id);
-  if (e) { e.name = agent_name; e.total = (e.total || 0) + inC + outC; } else { d.agents.push({ id: agent_id, name: agent_name, total: inC + outC }); }
+  if (e) { e.name = agent_name; e.msg = e.msg || ''; e.twitter = e.twitter || ''; e.total = (e.total || 0) + inC + outC; } else { d.agents.push({ id: agent_id, name: agent_name, msg: '', twitter: '', total: inC + outC }); }
 
   let u = d.usage.find(x => x.id === agent_id && x.date === t);
   if (u) { u.in = (u.in || 0) + inC; u.out = (u.out || 0) + outC; } else { d.usage.push({ id: agent_id, date: t, in: inC, out: outC, model }); }
