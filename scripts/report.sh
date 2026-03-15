@@ -117,7 +117,7 @@ RESULT=$(curl -s -X POST "$API_URL/api/report" \
 
 if echo "$RESULT" | python3 -c "import json,sys; exit(0 if json.load(sys.stdin).get('ok') else 1)"; then
     SERVER_TOTAL=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('total',0))")
-    echo "{\"total\": $CURRENT, \"time\": $(date +%s)000, \"cumulative\": $CURRENT, \"last_session_total\": $CURRENT}" > "$STATE_FILE"
+    # State already saved by Python with session_total, just log success
     log "Success! Reported $REPORT_TOKENS, server total: $SERVER_TOTAL"
 else
     log "Failed: $RESULT"

@@ -26,7 +26,7 @@ function saveDailySnapshot(d) {
   // Keep only last 30 days
   const dates = Object.keys(d.snapshots).sort().reverse();
   if (dates.length > 30) {
-    dates.slice(30).forEach(d => delete d.snapshots[d]);
+    dates.slice(30).forEach(date => delete d.snapshots[date]);
   }
 }
 function today() { return new Date().toISOString().split('T')[0]; }

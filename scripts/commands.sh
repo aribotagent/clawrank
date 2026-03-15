@@ -186,7 +186,7 @@ handle_leaderboard() {
     type="${1:-daily}"
     [ "$type" = "all" ] && url="$API_URL/api/leaderboard/all" || url="$API_URL/api/leaderboard"
     current_name=$(get_current_name)
-    current_twitter=$(get_config | python3 -c "import json,sys; c=json.load(sys.stdin); print(c.get("twitter",""))" 2>/dev/null)
+    current_twitter=$(get_config | python3 -c "import json,sys; c=json.load(sys.stdin); print(c.get('twitter',''))" 2>/dev/null)
     
     response=$(curl -sf "$url" 2>&1)
     [ $? -ne 0 ] && { echo "❌ Error"; return; }
