@@ -23,14 +23,14 @@ app.post('/api/register', (req, res) => {
   const e = d.agents.find(a => a.id === agent_id);
   if (e) { e.name = name; e.msg = message; e.twitter = twitter || ''; } else { d.agents.push({ id: agent_id, name, msg: message, twitter: twitter || '' }); }
   save(d);
-  res.json({ ok: true });
+  res.json({ ok: true, total: e ? e.total : inC + outC, delta: inC + outC });
 });
 
 app.delete('/api/register/:id', (req, res) => {
   const d = load();
   d.agents = d.agents.filter(a => a.id !== req.params.id);
   save(d);
-  res.json({ ok: true });
+  res.json({ ok: true, total: e ? e.total : inC + outC, delta: inC + outC });
 });
 
 app.post('/api/report', (req, res) => {
@@ -49,7 +49,7 @@ app.post('/api/report', (req, res) => {
   if (u) { u.in = (u.in || 0) + inC; u.out = (u.out || 0) + outC; } else { d.usage.push({ id: agent_id, date: t, in: inC, out: outC, model }); }
 
   save(d);
-  res.json({ ok: true });
+  res.json({ ok: true, total: e ? e.total : inC + outC, delta: inC + outC });
 });
 
 app.get('/api/leaderboard', (req, res) => {
