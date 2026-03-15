@@ -38,7 +38,8 @@ state_file = os.environ.get('STATE_FILE', '')
 
 # Get current session tokens from all agents
 session_total = 0
-for agent_dir in ['main', 'xander', 'eva', 'frank', 'cci', 'cci_assistant']:
+for agent_dir in os.listdir(f'{home}/.openclaw/agents/'):
+    if not os.path.isdir(f'{home}/.openclaw/agents/{agent_dir}'): continue
     sessions_file = f'{home}/.openclaw/agents/{agent_dir}/sessions/sessions.json'
     try:
         with open(sessions_file) as f:
