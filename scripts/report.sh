@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ClawRank Token Reporter
+# ClawRank Token Reporter - sessions.json + cumulative tracking
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,16 +30,16 @@ else: print(0)
 
 log "Registered at: $REG_TS"
 
-# Get tokens from sessions.json with cumulative tracking
-CURRENT=$(python3 -c "
-import json, os
+# Get tokens with proper cumulative tracking
+RESULT=$(python3 -c "
+import json, os, sys
+
 home = os.environ.get('HOME', '')
-state_file = os.environ.get('STATE_FILE', '')
+state_file = '${STATE_FILE}'
 
 # Get current session tokens from all agents
 session_total = 0
 for agent_dir in os.listdir(f'{home}/.openclaw/agents/'):
-    if not os.path.isdir(f'{home}/.openclaw/agents/{agent_dir}'): continue
     sessions_file = f'{home}/.openclaw/agents/{agent_dir}/sessions/sessions.json'
     try:
         with open(sessions_file) as f:
@@ -50,23 +50,39 @@ for agent_dir in os.listdir(f'{home}/.openclaw/agents/'):
                 session_total += tokens
     except: pass
 
-# Get previous cumulative from state
+# Get previous state
 prev_cumulative = 0
+prev_session = 0
 try:
     with open(state_file) as f:
         state = json.load(f)
     prev_cumulative = state.get('cumulative', 0)
+    prev_session = state.get('last_session_total', 0)
 except: pass
 
-# If sessions were reset (current < prev), keep previous cumulative
-# Otherwise use current session total
-if session_total >= prev_cumulative:
-    cumulative = session_total
+# Calculate delta
+new_tokens = session_total - prev_session
+
+if new_tokens > 0:
+    cumulative = prev_cumulative + new_tokens
+elif new_tokens < 0:
+    cumulative = prev_cumulative
 else:
     cumulative = prev_cumulative
 
-print(cumulative)
+# Save state with both values
+with open(state_file, 'w') as f:
+    json.dump({
+        'total': cumulative,
+        'cumulative': cumulative,
+        'last_session_total': session_total
+    }, f)
+
+print(f'{cumulative}|{new_tokens}')
 ")
+
+CURRENT=$(echo "$RESULT" | cut -d'|' -f1)
+NEW_TOKENS=$(echo "$RESULT" | cut -d'|' -f2)
 
 # Get previous
 PREV=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('total',0))" 2>/dev/null || echo "0")
@@ -84,7 +100,7 @@ if [ "$DELTA" -le 0 ]; then
     exit 0
 fi
 
-# Handle large delta - cap at 4M and carry over remainder
+# Handle large delta - cap at 4M
 REPORT_TOKENS=$DELTA
 REMAINDER=0
 if [ "$DELTA" -gt 4000000 ]; then
@@ -101,16 +117,8 @@ RESULT=$(curl -s -X POST "$API_URL/api/report" \
 
 if echo "$RESULT" | python3 -c "import json,sys; exit(0 if json.load(sys.stdin).get('ok') else 1)"; then
     SERVER_TOTAL=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('total',0))")
-    
-    # Save state - if there's remainder, save (CURRENT - REMAINDER) as previous
-    if [ "$REMAINDER" -gt 0 ]; then
-        NEW_PREV=$((CURRENT - REMAINDER))
-        echo "{\"total\": $NEW_PREV, \"time\": $(date +%s)000, \"cumulative\": $CURRENT}" > "$STATE_FILE"
-        log "Success! Reported $REPORT_TOKENS, saved state for next run. Server total: $SERVER_TOTAL"
-    else
-        echo "{\"total\": $CURRENT, \"time\": $(date +%s)000, \"cumulative\": $CURRENT}" > "$STATE_FILE"
-        log "Success! Reported $REPORT_TOKENS, server total: $SERVER_TOTAL"
-    fi
+    echo "{\"total\": $CURRENT, \"time\": $(date +%s)000, \"cumulative\": $CURRENT, \"last_session_total\": $CURRENT}" > "$STATE_FILE"
+    log "Success! Reported $REPORT_TOKENS, server total: $SERVER_TOTAL"
 else
     log "Failed: $RESULT"
 fi
