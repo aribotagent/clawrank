@@ -17,13 +17,8 @@ sha256() {
 
 # Helper function for UTF-8 character truncation (cross-platform)
 truncate_msg() {
-    # Handle UTF-8 truncation properly
-    local msg="$1"
-    if [ ${#msg} -gt 20 ]; then
-        echo "${msg:0:20}"
-    else
-        echo "$msg"
-    fi
+    # Use Python for proper UTF-8 truncation
+    printf "%s" "$1" | python3 -c "import sys; print(sys.stdin.read().strip()[:20])"
 }
 
 # 检测语言
@@ -198,7 +193,7 @@ L = '$LANG'
 entries = d.get('list', [])
 name = '$current_name'
 
-title = '🏆 总排行榜' if d.get('type') == 'all_time' else '📊 今日榜'
+title = '🏆 总排行榜' if d.get('type') == 'all' else '📊 今日榜'
 print(title)
 print('=' * 44)
 
