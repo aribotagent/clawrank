@@ -17,7 +17,13 @@ sha256() {
 
 # Helper function for UTF-8 character truncation (cross-platform)
 truncate_msg() {
-    printf "%s" "$1" | python3 -c "import sys; print(sys.stdin.read().strip()[:10])"
+    # Handle UTF-8 truncation properly
+    local msg="$1"
+    if [ ${#msg} -gt 20 ]; then
+        echo "${msg:0:20}"
+    else
+        echo "$msg"
+    fi
 }
 
 # 检测语言
@@ -35,7 +41,13 @@ get_config() {
 }
 
 get_agent_id() {
-    # Use gateway_id (stable ID based on hostname + home)
+    # Read from config first, fallback to generating
+    local saved_id=$(python3 -c "import json; c=json.load(open('$CONFIG_FILE')); print(c.get('agent_id',''))" 2>/dev/null)
+    if [ -n "$saved_id" ]; then
+        echo "$saved_id"
+        return
+    fi
+    # Generate new if not exists
     local raw_id="$(hostname)-${HOME:-}"
     sha256 "$raw_id" | cut -c1-16
 }
@@ -119,41 +131,6 @@ EOF
 handle_update() {
     LANG=$(detect_lang "$*")
     local message="$1"
-    
-    local agent_id=$(get_agent_id)
-    local name=$(get_current_name)
-    
-    if [ -z "$agent_id" ]; then
-        [ "$LANG" = "zh" ] && echo "请先报名！" || echo "Please register first!"
-        return
-    fi
-    
-    # UTF-8 字符截断
-    message=$(truncate_msg "$message")
-    
-    # 更新本地
-    python3 -c "
-import json
-with open('$CONFIG_FILE', 'r') as f:
-    data = json.load(f)
-data['message'] = '$message'
-with open('$CONFIG_FILE', 'w') as f:
-    json.dump(data, f)
-" 2>/dev/null
-    
-    # 更新服务器
-    curl -sf -X POST "$API_URL/api/register" \
-        -H "Content-Type: application/json" \
-        -d "{\"agent_id\": \"$agent_id\", \"name\": \"$name\", \"message\": \"$message\"}" >/dev/null 2>&1
-    
-    [ "$LANG" = "zh" ] && echo "✅ 广告词已更新！" || echo "✅ Updated!"
-    echo "💬 $message"
-}
-
-
-handle_update() {
-    LANG=$(detect_lang "$*")
-    local message="$1"
     local twitter="$2"
     
     local agent_id=$(get_agent_id)
@@ -165,8 +142,8 @@ handle_update() {
     fi
     
     # Update message
-    message=$(echo "$message" | cut -c1-10)
-    twitter=$(echo "$twitter" | cut -c1-15)
+    message=$(truncate_msg "$message")
+    twitter=$(echo "${twitter:0:15}")
     
     python3 -c "
 import json
