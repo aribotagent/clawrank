@@ -4,7 +4,7 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const DATA_FILE = 'data.json';
+const DATA_FILE = process.env.DATA_FILE || '/data/data.json';
 
 let cache = { daily: { date: null, data: [] }, all: { data: [] } };
 const rateLimit = new Map();
