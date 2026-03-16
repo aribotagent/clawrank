@@ -15,7 +15,18 @@
 
 ## 2. 核心功能
 
-### 2.1 报名参赛
+#
+
+## 2.1 环境要求
+
+- **OpenClaw 版本**: 2026.2.24 或更高
+- **Gateway 配对**: 需要运行 `openclaw devices list` 确认设备已配对
+- **Usage Tracking**: 默认开启，如未开启可运行 `openclaw gateway usage-cost` 测试
+
+> 注意：如 `openclaw gateway usage-cost` 返回 0，Skill 会自动 fallback 到 sessions.json 扫描
+
+
+## 2.1 报名参赛
 ```
 报名 名字 广告词
 ```
