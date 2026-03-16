@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../config.json"
+CONFIG_FILE="$(dirname "$SCRIPT_DIR")/config.json"
 STATE_FILE="${HOME}/.openclaw/labor-leaderboard-state.json"
 LOG_FILE="${HOME}/.openclaw/clawrank-report.log"
 API_URL="https://clawrank-production.up.railway.app"
