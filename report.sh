@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# ClawRank Token Reporter - using OpenClaw gateway usage-cost
+# ClawRank Token Reporter - using OpenClaw gateway usage-cost with fallback
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/config.json"
+CONFIG_FILE="$SCRIPT_DIR/../config.json"
 STATE_FILE="${HOME}/.openclaw/labor-leaderboard-state.json"
 LOG_FILE="${HOME}/.openclaw/clawrank-report.log"
 API_URL="https://clawrank-production.up.railway.app"
@@ -20,24 +20,52 @@ AGENT_NAME=$(python3 -c "import json; cfg=json.load(open('$CONFIG_FILE')); print
 
 log "Agent: $AGENT_NAME ($AGENT_ID)"
 
-# Get today's token usage from OpenClaw gateway
+# Try gateway usage-cost first
 USAGE_OUTPUT=$(openclaw gateway usage-cost 2>&1 | grep "Latest day" || echo "")
 
-if [ -z "$USAGE_OUTPUT" ]; then
+TODAY_TOKENS=""
+if [ -n "$USAGE_OUTPUT" ]; then
+    # Parse: "Latest day: 2026-03-16 · $16.04 · 93.7m tokens"
+    TODAY_TOKENS=$(echo "$USAGE_OUTPUT" | sed -E 's/.*([0-9]+\.[0-9]+m).*/\1/')
+fi
+
+# Fallback to sessions.json if gateway returns 0 or empty
+if [ -z "$TODAY_TOKENS" ] || [ "$TODAY_TOKENS" = "0m" ] || [ "$TODAY_TOKENS" = "0.0m" ]; then
+    log "Gateway usage-cost returned empty/0, falling back to sessions.json..."
+    
+    # Get tokens from sessions.json
+    TODAY_TOKENS=$(python3 -c "
+import json, os
+total = 0
+home = os.environ.get('HOME', '')
+for agent_dir in os.listdir(f'{home}/.openclaw/agents/'):
+    sessions_file = f'{home}/.openclaw/agents/{agent_dir}/sessions/sessions.json'
+    try:
+        with open(sessions_file) as f:
+            data = json.load(f)
+        for key, session in data.items():
+            tokens = session.get('totalTokens', 0)
+            if tokens:
+                total += tokens
+    except: pass
+print(f'{total // 1000000}.{total % 1000000 // 100000}m')
+" 2>/dev/null || echo "")
+fi
+
+if [ -z "$TODAY_TOKENS" ]; then
     log "No usage data found"
     exit 0
 fi
 
-# Parse: "Latest day: 2026-03-16 · $16.04 · 93.7m tokens"
-TODAY_TOKENS=$(echo "$USAGE_OUTPUT" | sed -E 's/.*([0-9]+\.[0-9]+m).*/\1/')
+log "Parsed tokens: $TODAY_TOKENS"
 
-if [ -z "$TODAY_TOKENS" ]; then
+# Convert m tokens to integer
+TODAY_INT=$(python3 -c "import sys; print(int(float('$TODAY_TOKENS'.replace('m','')) * 1000000))" 2>/dev/null || echo "0")
+
+if [ "$TODAY_INT" = "0" ] || [ -z "$TODAY_INT" ]; then
     log "Could not parse token amount"
     exit 0
 fi
-
-# Convert m tokens to integer (e.g., "93.7m" -> 93700000)
-TODAY_INT=$(python3 -c "import sys; print(int(float('$TODAY_TOKENS'.replace('m','')) * 1000000))")
 
 log "Today's tokens: $TODAY_INT"
 
