@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# ClawRank Token Reporter - sessions.json + cumulative tracking
+# ClawRank Token Reporter - using OpenClaw gateway usage-cost with fallback
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../config.json"
+CONFIG_FILE="$SCRIPT_DIR/config.json"
 STATE_FILE="${HOME}/.openclaw/labor-leaderboard-state.json"
 LOG_FILE="${HOME}/.openclaw/clawrank-report.log"
 API_URL="https://clawrank-production.up.railway.app"
@@ -18,27 +18,26 @@ log "Starting report..."
 AGENT_ID=$(python3 -c "import json; cfg=json.load(open('$CONFIG_FILE')); print(cfg.get('agent_id',''))")
 AGENT_NAME=$(python3 -c "import json; cfg=json.load(open('$CONFIG_FILE')); print(cfg.get('name','unknown'))")
 
-# Get registration timestamp
-REG_TS=$(python3 -c "
-import json,datetime
-cfg=json.load(open('$CONFIG_FILE'))
-reg=cfg.get('registered_at','')
-if reg:
-    print(int(datetime.datetime.fromisoformat(reg.replace('Z','+00:00')).timestamp()))
-else: print(0)
-")
+log "Agent: $AGENT_NAME ($AGENT_ID)"
 
-log "Registered at: $REG_TS"
+# Try gateway usage-cost first
+USAGE_OUTPUT=$(openclaw gateway usage-cost 2>&1 | grep "Latest day" || echo "")
 
-# Get tokens with proper cumulative tracking
-RESULT=$(python3 -c "
-import json, os, sys
+TODAY_TOKENS=""
+if [ -n "$USAGE_OUTPUT" ]; then
+    # Parse: "Latest day: 2026-03-16 · $16.04 · 93.7m tokens"
+    TODAY_TOKENS=$(echo "$USAGE_OUTPUT" | sed -E 's/.*([0-9]+\.[0-9]+m).*/\1/')
+fi
 
+# Fallback to sessions.json if gateway returns 0 or empty
+if [ -z "$TODAY_TOKENS" ] || [ "$TODAY_TOKENS" = "0m" ] || [ "$TODAY_TOKENS" = "0.0m" ]; then
+    log "Gateway usage-cost returned empty/0, falling back to sessions.json..."
+    
+    # Get tokens from sessions.json
+    TODAY_TOKENS=$(python3 -c "
+import json, os
+total = 0
 home = os.environ.get('HOME', '')
-state_file = '${STATE_FILE}'
-
-# Get current session tokens from all agents
-session_total = 0
 for agent_dir in os.listdir(f'{home}/.openclaw/agents/'):
     sessions_file = f'{home}/.openclaw/agents/{agent_dir}/sessions/sessions.json'
     try:
@@ -47,66 +46,48 @@ for agent_dir in os.listdir(f'{home}/.openclaw/agents/'):
         for key, session in data.items():
             tokens = session.get('totalTokens', 0)
             if tokens:
-                session_total += tokens
+                total += tokens
     except: pass
-
-# Get previous state
-prev_cumulative = 0
-prev_session = 0
-try:
-    with open(state_file) as f:
-        state = json.load(f)
-    prev_cumulative = state.get('cumulative', 0)
-    prev_session = state.get('last_session_total', 0)
-except: pass
-
-# Calculate delta
-new_tokens = session_total - prev_session
-
-if new_tokens > 0:
-    cumulative = prev_cumulative + new_tokens
-elif new_tokens < 0:
-    cumulative = prev_cumulative
-else:
-    cumulative = prev_cumulative
-
-# Save state with both values
-with open(state_file, 'w') as f:
-    json.dump({
-        'total': cumulative,
-        'cumulative': cumulative,
-        'last_session_total': session_total
-    }, f)
-
-print(f'{cumulative}|{new_tokens}')
-")
-
-CURRENT=$(echo "$RESULT" | cut -d'|' -f1)
-NEW_TOKENS=$(echo "$RESULT" | cut -d'|' -f2)
-
-# Get previous
-PREV=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('total',0))" 2>/dev/null || echo "0")
-
-log "Current: $CURRENT, Previous: $PREV"
-
-DELTA=$((CURRENT - PREV))
-if [ "$DELTA" -lt 0 ]; then
-    log "Negative delta, resetting"
-    DELTA=0
+print(f'{total // 1000000}.{total % 1000000 // 100000}m')
+" 2>/dev/null || echo "")
 fi
 
-if [ "$DELTA" -le 0 ]; then
-    log "No new tokens"
+if [ -z "$TODAY_TOKENS" ]; then
+    log "No usage data found"
     exit 0
 fi
 
+log "Parsed tokens: $TODAY_TOKENS"
+
+# Convert m tokens to integer
+TODAY_INT=$(python3 -c "import sys; print(int(float('$TODAY_TOKENS'.replace('m','')) * 1000000))" 2>/dev/null || echo "0")
+
+if [ "$TODAY_INT" = "0" ] || [ -z "$TODAY_INT" ]; then
+    log "Could not parse token amount"
+    exit 0
+fi
+
+log "Today's tokens: $TODAY_INT"
+
+# Get previous reported value
+PREV=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('last_tokens', 0))" 2>/dev/null || echo "0")
+
+log "Previous: $PREV"
+
+DELTA=$((TODAY_INT - PREV))
+
+if [ "$DELTA" -le 0 ]; then
+    log "No new tokens to report"
+    exit 0
+fi
+
+log "Delta: $DELTA"
+
 # Handle large delta - cap at 4M
 REPORT_TOKENS=$DELTA
-REMAINDER=0
 if [ "$DELTA" -gt 4000000 ]; then
     REPORT_TOKENS=4000000
-    REMAINDER=$((DELTA - 4000000))
-    log "Delta $DELTA exceeds limit, reporting 4M, carrying over $REMAINDER"
+    log "Capped to 4M"
 fi
 
 log "Reporting $REPORT_TOKENS tokens..."
@@ -116,9 +97,9 @@ RESULT=$(curl -s -X POST "$API_URL/api/report" \
     -d "{\"agent_id\": \"$AGENT_ID\", \"agent_name\": \"$AGENT_NAME\", \"tokens_in\": $REPORT_TOKENS}")
 
 if echo "$RESULT" | python3 -c "import json,sys; exit(0 if json.load(sys.stdin).get('ok') else 1)"; then
-    SERVER_TOTAL=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('total',0))")
-    # State already saved by Python with session_total, just log success
-    log "Success! Reported $REPORT_TOKENS, server total: $SERVER_TOTAL"
+    # Save today's tokens as last reported
+    echo "{\"last_tokens\": $TODAY_INT, \"time\": $(date +%s)000}" > "$STATE_FILE"
+    log "Success! Reported $REPORT_TOKENS tokens"
 else
     log "Failed: $RESULT"
 fi
