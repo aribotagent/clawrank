@@ -93,16 +93,12 @@ app.get('/api/stats', (req, res) => { const d = load(); res.json({ total: d.agen
 
 app.get('/api/leaderboard/:date', (req, res) => {
   const d = load();
-  const date = req.params.date;
-  if (date && d.snapshots && d.snapshots[date]) {
-    res.json({ date, type: 'snapshot', list: d.snapshots[date] });
-    return;
-  }
-  const t = today();
+  const date = req.params.date || today();
+  // Query usage table directly by date
   const list = d.agents.map(a => {
-    const u = d.usage.find(x => x.id === a.id && x.date === t);
+    const u = d.usage.find(x => x.id === a.id && x.date === date);
     return { id: a.id, name: a.name, msg: a.msg || "", twitter: a.twitter || '', in: u?.in || 0, out: u?.out || 0, total: (u?.in || 0) + (u?.out || 0), model: u?.model || '' };
   }).sort((a, b) => b.total - a.total).map((r, i) => ({ rank: i + 1, ...r }));
-  res.json({ date: t, type: 'daily', list });
+  res.json({ date, type: 'daily', list });
 });
 app.listen(PORT, () => console.log('Clawrank running on ' + PORT));
