@@ -29,7 +29,7 @@ function saveDailySnapshot(d) {
     dates.slice(30).forEach(date => delete d.snapshots[date]);
   }
 }
-function today() { return new Date().toISOString().split('T')[0]; }
+function today() { return new Date().toLocaleDateString('en-CA'); }
 
 app.post('/api/register', (req, res) => {
   const { agent_id, name, message, twitter } = req.body;
